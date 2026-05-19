@@ -103,9 +103,10 @@ git push -u origin main
 
 1. Vai su https://railway.app e fai signup con GitHub.
 2. Crea un nuovo project → "Deploy from GitHub repo" → seleziona `aagnoli-beep/NewsFinance`.
-3. Railway rileverà il repo. Imposta:
-   - **Root Directory**: lascia vuoto (la config in `infra/nixpacks.toml` gestisce il routing al backend).
-   - In alternativa, se Railway non legge la config: imposta Root Directory `backend/` e Build Command `pip install uv && uv sync --frozen && uv run alembic upgrade head`, Start Command `uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
+3. Railway rileverà il repo. Imposta nelle **Settings** del service:
+   - **Root Directory**: `backend`
+   - Build/Start command: lascia vuoti — verranno letti automaticamente da `backend/Procfile` e `backend/railway.toml` (Nixpacks rileva `uv.lock` e usa uv).
+   - La migration Alembic gira automaticamente al deploy via il `release:` step del Procfile.
 4. Nella sezione **Variables** aggiungi:
    ```
    DATABASE_URL=<la tua stringa Neon asyncpg>
