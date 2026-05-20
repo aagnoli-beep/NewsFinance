@@ -49,7 +49,30 @@ S&P 500 + macro USA + commodity principali (Brent, WTI, oro, DXY, TNX). Niente a
 
 ## Stato attuale
 
-Vedi `README.md` per lo status di fase. Il piano in `.claude/plans/` ha la roadmap completa per fasi (0→8).
+**Fase 3 completata.** Sistema in produzione con:
+- 5 fonti di ingestion (RSS, Polygon news, SEC EDGAR, Finnhub, FRED) + 1 di prezzi (Polygon)
+- Dedup semantico via Voyage AI voyage-3.5-lite + pgvector cosine similarity (soglia 0.85)
+- Event classifier (Claude Haiku 4.5, tool_use): event_type 20 cat, entities, novelty, summary
+- Entity linker che popola `entities` canonical IDs
+- Expectation engine ibrido: earnings via Finnhub consensus, macro via FRED prior, qualitative via Sonnet 4.6
+- Frontend Next.js: pagine Status/Feed/Clusters/Coverage
+- APScheduler in-process, tutti i job ogni 2-30 min
+
+Code paths:
+- `backend/app/ingestion/` — 6 ingester + dedup
+- `backend/app/agents/` — classifier + entity_linker + expectation
+- `backend/app/worker/scheduler.py` — APScheduler
+- `backend/app/api/` — health, events, coverage, clusters
+
+Vedi `README.md` per il delivery. Il piano in `.claude/plans/` ha la roadmap fasi (0→8).
+
+## Note operative per Claude in nuove sessioni
+
+- **API key richieste**: `ANTHROPIC_API_KEY` è obbligatoria per attivare classifier/expectation qualitative. Le altre key (Polygon, Voyage, Finnhub, FRED) sono già su Railway.
+- **Test classifier locale**: aggiungi `ANTHROPIC_API_KEY=sk-ant-...` in `backend/.env`, poi `uv run python -m app.scripts.classify_clusters --limit 5`.
+- **Test expectation locale**: dopo classifier, `uv run python -m app.scripts.compute_expectations --limit 5`.
+- **Smoke test produzione**: `curl https://newsfinance-production.up.railway.app/api/clusters/stats` e `/api/coverage`.
+- **Frontend**: https://news-finance-xi.vercel.app — pagine `/feed`, `/clusters`, `/coverage`.
 
 ## Convenzioni
 
