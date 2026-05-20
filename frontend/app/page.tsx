@@ -1,8 +1,11 @@
+import { Nav } from "@/components/nav";
 import { SystemStatus } from "@/components/system-status";
 
 export default function HomePage() {
   return (
-    <main className="mx-auto max-w-3xl px-6 py-16">
+    <main className="mx-auto max-w-3xl px-6 py-12">
+      <Nav />
+
       <header className="mb-12">
         <h1 className="text-3xl font-semibold tracking-tight">NewsFinance</h1>
         <p className="mt-2 text-sm text-neutral-400">
