@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     env: Literal["development", "staging", "production"] = "development"
     log_level: str = "INFO"
     cors_origins: str = "http://localhost:3000"
+    cors_origin_regex: str = ""
 
     database_url: str = Field(default="postgresql+asyncpg://localhost/newsfinance")
     redis_url: str = Field(default="redis://localhost:6379/0")
