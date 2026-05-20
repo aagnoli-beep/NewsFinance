@@ -16,8 +16,14 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from loguru import logger
 
+from app.agents.calibration import CalibrationAgent
+from app.agents.confounder import ConfounderDetector
 from app.agents.event_classifier import EventClassifier
 from app.agents.expectation import ExpectationEngine
+from app.agents.exposure import ExposureEngine
+from app.agents.market_reaction import MarketReactionEngine
+from app.agents.outcome_tracker import OutcomeTracker
+from app.agents.scoring import ScoringEngine
 from app.core.db import SessionLocal
 from app.ingestion.dedup import DedupEngine
 from app.ingestion.finnhub import FinnhubEarningsCalendarIngester, FinnhubNewsIngester
@@ -94,6 +100,48 @@ async def run_expectation_engine() -> None:
     async with SessionLocal() as session:
         counts = await ExpectationEngine(session).process_pending(limit=30)
         logger.info("scheduled_expectation_done", **counts)
+
+
+async def run_exposure_engine() -> None:
+    """Calcola exposure graph per i cluster classificati."""
+    async with SessionLocal() as session:
+        counts = await ExposureEngine(session).process_pending(limit=30)
+        logger.info("scheduled_exposure_done", **counts)
+
+
+async def run_market_reaction() -> None:
+    """Calcola abnormal return + volume z-score per cluster con exposures."""
+    async with SessionLocal() as session:
+        counts = await MarketReactionEngine(session).process_pending(limit=50)
+        logger.info("scheduled_market_reaction_done", **counts)
+
+
+async def run_confounder_detector() -> None:
+    """Scansiona confounder per cluster classificati."""
+    async with SessionLocal() as session:
+        counts = await ConfounderDetector(session).process_pending(limit=50)
+        logger.info("scheduled_confounder_done", **counts)
+
+
+async def run_scoring() -> None:
+    """Genera impact_score e alert per cluster con expectation+exposure+reaction."""
+    async with SessionLocal() as session:
+        counts = await ScoringEngine(session).process_pending(limit=50)
+        logger.info("scheduled_scoring_done", **counts)
+
+
+async def run_outcome_tracker() -> None:
+    """Aggiorna outcomes per alert con >=1 giorno di età."""
+    async with SessionLocal() as session:
+        counts = await OutcomeTracker(session).process_pending(limit=100)
+        logger.info("scheduled_outcome_done", **counts)
+
+
+async def run_calibration() -> None:
+    """Genera report di calibration (no apply, solo log)."""
+    async with SessionLocal() as session:
+        report = await CalibrationAgent(session).run()
+        logger.info("scheduled_calibration_done", precision=report.get("precision_3d"))
 
 
 def build_scheduler() -> AsyncIOScheduler:
@@ -185,6 +233,60 @@ def build_scheduler() -> AsyncIOScheduler:
         run_expectation_engine,
         IntervalTrigger(minutes=10),
         id="expectation_engine",
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Phase 4: exposure ogni 7 min (deterministico graph + opzionale Haiku enrichment).
+    scheduler.add_job(
+        run_exposure_engine,
+        IntervalTrigger(minutes=7),
+        id="exposure_engine",
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Phase 5: market reaction ogni 10 min (pura math su prezzi locali).
+    scheduler.add_job(
+        run_market_reaction,
+        IntervalTrigger(minutes=10),
+        id="market_reaction",
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Phase 6: confounder detector ogni 15 min.
+    scheduler.add_job(
+        run_confounder_detector,
+        IntervalTrigger(minutes=15),
+        id="confounder_detector",
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Phase 6: scoring + alert generation ogni 15 min (dopo che gli altri hanno girato).
+    scheduler.add_job(
+        run_scoring,
+        IntervalTrigger(minutes=15),
+        id="scoring_engine",
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Phase 7: outcome tracker ogni 1 ora (orizzonti T+1d/3d/7d/30d).
+    scheduler.add_job(
+        run_outcome_tracker,
+        IntervalTrigger(hours=1),
+        id="outcome_tracker",
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Phase 8: calibration daily a 22:30 UTC (post-update prezzi).
+    scheduler.add_job(
+        run_calibration,
+        CronTrigger(hour=22, minute=30),
+        id="calibration",
         max_instances=1,
         coalesce=True,
     )

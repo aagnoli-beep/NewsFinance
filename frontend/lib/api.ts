@@ -106,3 +106,77 @@ export type ClusterStats = {
   with_expectations: number;
   by_type: Array<{ event_type: string; count: number }>;
 };
+
+export type AlertEntity = {
+  id: number;
+  name: string;
+  ticker: string | null;
+  role: string;
+};
+
+export type AlertExposure = {
+  asset_ticker: string;
+  exposure_type: string;
+  hop_distance: number;
+  weight: number;
+  rationale: string | null;
+};
+
+export type AlertReaction = {
+  ticker: string;
+  abnormal_return_1d: number | null;
+  abnormal_return_3d: number | null;
+  volume_zscore: number | null;
+  market_confirmation: string | null;
+};
+
+export type AlertExpectation = {
+  surprise_direction: string;
+  surprise_magnitude: string;
+  rationale: string | null;
+};
+
+export type AlertOutcome = {
+  t_plus_1d_ar: number | null;
+  t_plus_3d_ar: number | null;
+  t_plus_7d_ar: number | null;
+  t_plus_30d_ar: number | null;
+  outcome_label: string;
+  evaluated_at: string | null;
+};
+
+export type Alert = {
+  id: number;
+  cluster_id: number;
+  created_at: string;
+  impact_score: number;
+  confidence: number;
+  explanation_md: string;
+  components: Record<string, unknown>;
+  event_type: string;
+  headline: string;
+  summary: string | null;
+  first_seen: string;
+  novelty_score: number;
+  primary_entities: AlertEntity[];
+  exposures: AlertExposure[];
+  reactions: AlertReaction[];
+  expectation: AlertExpectation | null;
+  outcome: AlertOutcome | null;
+  confounder_count: number;
+  max_confounder_score: number | null;
+};
+
+export type AlertListResponse = {
+  items: Alert[];
+  total: number;
+};
+
+export type AlertsStats = {
+  total_alerts: number;
+  last_24h: number;
+  last_7d: number;
+  avg_impact_score: number | null;
+  outcomes: Record<string, number>;
+  precision_3d: number | null;
+};

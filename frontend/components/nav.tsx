@@ -26,6 +26,12 @@ export function Nav() {
           Clusters
         </Link>
         <Link
+          href="/alerts"
+          className="text-neutral-400 hover:text-neutral-100"
+        >
+          Alerts
+        </Link>
+        <Link
           href="/coverage"
           className="text-neutral-400 hover:text-neutral-100"
         >

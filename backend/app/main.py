@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
+from app.api.alerts import router as alerts_router
 from app.api.clusters import router as clusters_router
 from app.api.coverage import router as coverage_router
 from app.api.events import router as events_router
@@ -57,6 +58,7 @@ def create_app() -> FastAPI:
     app.include_router(events_router, prefix="/api")
     app.include_router(coverage_router, prefix="/api")
     app.include_router(clusters_router, prefix="/api")
+    app.include_router(alerts_router, prefix="/api")
 
     return app
 
