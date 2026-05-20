@@ -16,6 +16,8 @@ class EntityType(StrEnum):
     ETF = "etf"
     INDEX = "index"
     SECTOR = "sector"
+    CENTRAL_BANK = "central_bank"
+    INDUSTRY_TERM = "industry_term"
 
 
 class LinkType(StrEnum):

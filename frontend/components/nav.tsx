@@ -20,6 +20,12 @@ export function Nav() {
           Feed
         </Link>
         <Link
+          href="/clusters"
+          className="text-neutral-400 hover:text-neutral-100"
+        >
+          Clusters
+        </Link>
+        <Link
           href="/coverage"
           className="text-neutral-400 hover:text-neutral-100"
         >

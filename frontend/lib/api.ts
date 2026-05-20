@@ -64,3 +64,45 @@ export type CoverageResponse = {
   total_bars: number;
   by_ticker: TickerCoverage[];
 };
+
+export type ClusterEntity = {
+  id: number;
+  type: string;
+  name: string;
+  ticker: string | null;
+  role: string;
+};
+
+export type ClusterExpectation = {
+  baseline_source: string;
+  expected_value: string | null;
+  actual_value: string | null;
+  surprise_direction: string;
+  surprise_magnitude: string;
+  surprise_zscore: number | null;
+  rationale: string | null;
+};
+
+export type Cluster = {
+  id: number;
+  first_seen: string;
+  event_type: string;
+  headline_canonical: string;
+  summary: string | null;
+  novelty_score: number;
+  n_sources: number;
+  entities: ClusterEntity[];
+  expectation: ClusterExpectation | null;
+};
+
+export type ClusterListResponse = {
+  items: Cluster[];
+  total: number;
+};
+
+export type ClusterStats = {
+  total_clusters: number;
+  classified: number;
+  with_expectations: number;
+  by_type: Array<{ event_type: string; count: number }>;
+};

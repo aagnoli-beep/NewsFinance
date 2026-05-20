@@ -16,6 +16,8 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from loguru import logger
 
+from app.agents.event_classifier import EventClassifier
+from app.agents.expectation import ExpectationEngine
 from app.core.db import SessionLocal
 from app.ingestion.dedup import DedupEngine
 from app.ingestion.finnhub import FinnhubEarningsCalendarIngester, FinnhubNewsIngester
@@ -78,6 +80,20 @@ async def run_polygon_prices_update() -> None:
         results = await PolygonPricesIngester(session).backfill(start=start, end=end)
         total = sum(results.values())
         logger.info("scheduled_prices_update_done", total_bars=total, tickers=len(results))
+
+
+async def run_classifier() -> None:
+    """Classifica i cluster pendenti via Claude Haiku."""
+    async with SessionLocal() as session:
+        counts = await EventClassifier(session).process_pending(limit=50)
+        logger.info("scheduled_classifier_done", **counts)
+
+
+async def run_expectation_engine() -> None:
+    """Calcola expectation per i cluster classificati senza expectation."""
+    async with SessionLocal() as session:
+        counts = await ExpectationEngine(session).process_pending(limit=30)
+        logger.info("scheduled_expectation_done", **counts)
 
 
 def build_scheduler() -> AsyncIOScheduler:
@@ -151,6 +167,24 @@ def build_scheduler() -> AsyncIOScheduler:
         run_polygon_prices_update,
         CronTrigger(hour=21, minute=30),
         id="polygon_prices",
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Phase 2: classifier ogni 5 min (Haiku è veloce, ~$0.001 per cluster).
+    scheduler.add_job(
+        run_classifier,
+        IntervalTrigger(minutes=5),
+        id="event_classifier",
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Phase 3: expectation engine ogni 10 min (alcuni cluster richiedono Sonnet, più caro).
+    scheduler.add_job(
+        run_expectation_engine,
+        IntervalTrigger(minutes=10),
+        id="expectation_engine",
         max_instances=1,
         coalesce=True,
     )

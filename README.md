@@ -6,7 +6,19 @@ Vedi il piano completo in `.claude/plans/` o `CLAUDE.md` per l'architettura.
 
 ## Status
 
-**Fase 0 — Foundation completata in locale.** Backend FastAPI + frontend Next.js compilano e funzionano; lo schema DB completo (13 tabelle) è in Alembic. Mancano solo i deploy effettivi che richiedono i tuoi account su Neon, Upstash, Railway e Vercel — segui `docs/SETUP.md` passo passo.
+**Fase 1 — Ingestion attiva in produzione.**
+- 6 ingester attivi: RSS (13 feed), SEC EDGAR 8-K, Polygon news + prezzi, Finnhub news + earnings calendar, FRED 17 serie macro
+- Backfill 1 anno completato: 97 ticker × 252 giorni = 24.444 daily bars
+- Dedup engine: Voyage AI voyage-3.5-lite + pgvector cosine similarity, soglia 0.85
+- Worker scheduler APScheduler in-process: tutti i job girano ogni 2-30 min in automatico
+- Frontend pubblico: https://news-finance-xi.vercel.app
+  - `/` system status
+  - `/feed` raw event stream con filtri per fonte
+  - `/coverage` stato copertura prezzi per ticker
+
+Servizi in produzione: Vercel + Railway Hobby + Neon Postgres free + Upstash Redis free. Costo operativo ~$60/mese (Polygon $29 + Railway $5-8 + LLM in Fase 2).
+
+**Prossime fasi:** classifier evento → expectation engine → exposure graph → market reaction → confounder → scoring → outcome tracking.
 
 ## Layout
 

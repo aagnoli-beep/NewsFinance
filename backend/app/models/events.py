@@ -28,6 +28,7 @@ class SourceQuality(StrEnum):
 
 
 class EventType(StrEnum):
+    UNCLASSIFIED = "unclassified"
     EARNINGS = "earnings"
     GUIDANCE = "guidance"
     CONTRACT = "contract"
@@ -41,6 +42,11 @@ class EventType(StrEnum):
     LITIGATION = "litigation"
     PERSONNEL = "personnel"
     ANALYST_RATING = "analyst_rating"
+    BUYBACK = "buyback"
+    DIVIDEND = "dividend"
+    PARTNERSHIP = "partnership"
+    LAYOFFS = "layoffs"
+    BANKRUPTCY = "bankruptcy"
     OTHER = "other"
 
 
