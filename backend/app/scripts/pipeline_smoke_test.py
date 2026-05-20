@@ -30,7 +30,6 @@ from app.core.db import SessionLocal
 from app.models.entities import Entity
 from app.models.events import EventCluster, EventEntity, RawEvent
 
-
 TARGET_TICKER = "NVDA"
 
 
