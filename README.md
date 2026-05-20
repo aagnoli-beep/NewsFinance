@@ -6,19 +6,42 @@ Vedi il piano completo in `.claude/plans/` o `CLAUDE.md` per l'architettura.
 
 ## Status
 
-**Fase 3 completata.** Ingestion + classification + expectation engine attivi.
+**Tutte le 8 fasi completate.** MVP end-to-end attivo: ingestion → dedup → classify → expectation → exposure → market reaction → confounder → scoring → alert → outcome → calibration.
 
-### Cosa fa già il sistema
+### Cosa fa il sistema end-to-end
 
-- **Ingestion (24/7)** — 6 fonti: RSS (13 feed), SEC EDGAR 8-K, Polygon news + prezzi, Finnhub news + earnings calendar, FRED 17 serie macro
-- **Dedup semantico** — Voyage AI `voyage-3.5-lite` (1024d) + pgvector cosine, soglia 0.85, lookback 24h
-- **Event classifier** — Claude Haiku 4.5 con tool_use structured output, 20 categorie evento + entity extraction + novelty score
-- **Entity linker** — popola tabella `entities` canonical IDs (match per ticker poi name, create se nuovo)
-- **Expectation engine ibrido**:
-  - earnings → consensus EPS/revenue da Finnhub, calcolo surprise direction+magnitude+z-score
-  - macro_data → confronto con FRED prior release come baseline
-  - qualitative (M&A, contract, geopolitical, ...) → Sonnet 4.6 con contesto news ultime 90 giorni
-- **APScheduler in-process**: classifier ogni 5 min, expectation ogni 10 min, ingestion ogni 2-30 min, prezzi update daily
+```
+[ingestion]   RSS · Polygon · SEC EDGAR · Finnhub · FRED          → raw_events
+       ↓
+[dedup]       Voyage AI voyage-3.5-lite + pgvector cosine 0.85    → event_clusters
+       ↓
+[classifier]  Claude Haiku 4.5 tool_use, 20 event types + entities → cluster.event_type
+       ↓
+[entity link] match per ticker/nome, create se mancante           → entities + event_entities
+       ↓
+[expectation] earnings via Finnhub | macro via FRED prior |
+              qualitative via Sonnet 4.6 con news prior 90gg      → expectations
+       ↓
+[exposure]    direct + peer + supplier/customer + sector ETF
+              via entity_links seedato (97 entities, 638 links)
+              + Haiku enrichment per entità non nel graph         → exposures
+       ↓
+[reaction]    abnormal return 1d/3d vs SPY (beta=1) +
+              volume z-score vs 20d baseline +
+              market_confirmation: did_react / did_not / unclear  → market_reactions
+       ↓
+[confounder]  scan ±24h, materiality basato su entity overlap +
+              systemic event types (FOMC/macro/geopolitical)      → confounders
+       ↓
+[scoring]     impact = 0.15·novelty + 0.30·surprise +
+              0.20·exposure + 0.25·confirm + 0.10·source           → alerts (≥0.65)
+              × (1 - confounder_penalty cap 0.5)
+       ↓
+[outcome]     AR cumulato T+1d/3d/7d/30d, label:
+              confirmed | reversed | flat | confounded | pending  → outcomes
+       ↓
+[calibration] daily report precision_3d + alert_rate + reccs      → log structured
+```
 
 ### Frontend pubblico
 
@@ -26,7 +49,8 @@ https://news-finance-xi.vercel.app
 
 - `/` system status (DB + Redis + API health)
 - `/feed` stream live raw_events con filtri per fonte
-- `/clusters` cluster classificati con event_type, entities, surprise direction/magnitude
+- `/clusters` cluster classificati (event_type, entities, surprise)
+- `/alerts` alerts con impact_score, surprise, reaction, outcome, exposures
 - `/coverage` copertura prezzi per i 97 ticker dell'universe
 
 ### Stack
