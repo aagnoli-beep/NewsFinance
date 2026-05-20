@@ -13,6 +13,8 @@ from loguru import logger
 
 from app.core.db import SessionLocal
 from app.ingestion.base import NewsIngester
+from app.ingestion.finnhub import FinnhubEarningsCalendarIngester, FinnhubNewsIngester
+from app.ingestion.fred import FREDIngester
 from app.ingestion.polygon_news import PolygonNewsIngester
 from app.ingestion.rss import RSSIngester
 from app.ingestion.sec_edgar import SECEdgarIngester
@@ -21,6 +23,9 @@ REGISTRY: dict[str, type[NewsIngester]] = {
     "rss": RSSIngester,
     "sec_edgar": SECEdgarIngester,
     "polygon_news": PolygonNewsIngester,
+    "finnhub_news": FinnhubNewsIngester,
+    "finnhub_earnings": FinnhubEarningsCalendarIngester,
+    "fred": FREDIngester,
 }
 
 
