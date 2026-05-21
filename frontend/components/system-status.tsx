@@ -52,9 +52,9 @@ export function SystemStatus() {
 
   return (
     <div className="mt-4 space-y-2 text-sm">
-      <StatusRow label="API" ok={health.status === "ok"} />
-      <StatusRow label="Database" ok={health.checks?.database ?? false} />
-      <StatusRow label="Redis" ok={health.checks?.redis ?? false} />
+      <StatusRow label="API (backend)" ok={health.status === "ok"} />
+      <StatusRow label="Database (Postgres)" ok={health.checks?.database ?? false} />
+      <StatusRow label="Cache (Redis)" ok={health.checks?.redis ?? false} />
     </div>
   );
 }
@@ -68,7 +68,7 @@ function StatusRow({ label, ok }: { label: string; ok: boolean }) {
           ok ? "bg-emerald-950 text-emerald-400" : "bg-red-950 text-red-400"
         }`}
       >
-        {ok ? "online" : "offline"}
+        {ok ? "attivo" : "offline"}
       </span>
     </div>
   );

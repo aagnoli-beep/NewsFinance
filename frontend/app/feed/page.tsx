@@ -3,14 +3,15 @@
 import { useEffect, useState } from "react";
 import { Nav } from "@/components/nav";
 import { apiFetch, type FeedResponse, type FeedStats, type RawEvent } from "@/lib/api";
+import { sourceFriendlyIT } from "@/lib/labels";
 
 const SOURCE_FILTERS = [
-  { label: "All", value: "" },
-  { label: "RSS", value: "rss" },
+  { label: "Tutte", value: "" },
+  { label: "Stampa (RSS)", value: "rss" },
   { label: "Polygon", value: "polygon" },
   { label: "Finnhub", value: "finnhub" },
-  { label: "SEC", value: "sec_edgar" },
-  { label: "FRED", value: "fred" },
+  { label: "SEC EDGAR", value: "sec_edgar" },
+  { label: "Fed (FRED)", value: "fred" },
 ];
 
 export default function FeedPage() {
@@ -37,7 +38,7 @@ export default function FeedPage() {
           setError(null);
         }
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "fetch failed");
+        if (!cancelled) setError(err instanceof Error ? err.message : "errore caricamento");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -56,18 +57,19 @@ export default function FeedPage() {
       <Nav />
 
       <header className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight">Raw feed</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">News in tempo reale</h1>
         <p className="mt-2 text-sm text-neutral-400">
-          Stream live di tutti i raw_events ingeriti dalle fonti. Ogni 30s.
+          Tutte le news appena ingerite dalle 6 fonti del sistema, prima di essere
+          interpretate. Si aggiorna ogni 30 secondi.
         </p>
       </header>
 
       {stats && (
         <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard label="Events" value={stats.total_events.toLocaleString()} />
-          <StatCard label="Clusters" value={stats.total_clusters.toLocaleString()} />
-          <StatCard label="Pending dedup" value={stats.pending_dedup.toLocaleString()} />
-          <StatCard label="Last 24h" value={stats.last_24h.toLocaleString()} />
+          <StatCard label="Totali" value={stats.total_events.toLocaleString("it-IT")} />
+          <StatCard label="Eventi unici" value={stats.total_clusters.toLocaleString("it-IT")} />
+          <StatCard label="Da raggruppare" value={stats.pending_dedup.toLocaleString("it-IT")} />
+          <StatCard label="Ultime 24h" value={stats.last_24h.toLocaleString("it-IT")} />
         </section>
       )}
 
@@ -89,7 +91,7 @@ export default function FeedPage() {
 
       {error && (
         <p className="mb-4 text-sm text-red-400">
-          Errore caricamento: <span className="font-mono">{error}</span>
+          Errore: <span className="font-mono">{error}</span>
         </p>
       )}
 
@@ -119,6 +121,7 @@ function FeedItem({ event }: { event: RawEvent }) {
   const ts = event.published_at ?? event.ingested_at;
   const date = new Date(ts);
   const tickers = (event.raw_meta?.tickers as string[] | undefined) ?? [];
+  const friendlySource = sourceFriendlyIT(event.source);
 
   return (
     <li className="py-4">
@@ -132,19 +135,10 @@ function FeedItem({ event }: { event: RawEvent }) {
           })}
         </time>
         <span className="rounded bg-neutral-900 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">
-          {event.source}
-        </span>
-        <span
-          className={`rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${
-            event.source_quality === "primary"
-              ? "bg-emerald-950 text-emerald-400"
-              : "bg-neutral-900 text-neutral-400"
-          }`}
-        >
-          {event.source_quality}
+          {friendlySource}
         </span>
         {event.cluster_id !== null && (
-          <span className="text-[10px] text-neutral-600">cluster #{event.cluster_id}</span>
+          <span className="text-[10px] text-neutral-600">evento #{event.cluster_id}</span>
         )}
       </div>
       <p className="mt-1.5 text-sm text-neutral-100">
@@ -163,6 +157,7 @@ function FeedItem({ event }: { event: RawEvent }) {
       </p>
       {tickers.length > 0 && (
         <div className="mt-1.5 flex flex-wrap gap-1.5">
+          <span className="text-[10px] text-neutral-600">Aziende citate:</span>
           {tickers.slice(0, 6).map((t) => (
             <span
               key={t}

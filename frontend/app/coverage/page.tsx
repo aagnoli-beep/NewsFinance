@@ -14,7 +14,7 @@ export default function CoveragePage() {
       .then((d) => !cancelled && setData(d))
       .catch((err) =>
         !cancelled &&
-        setError(err instanceof Error ? err.message : "fetch failed")
+        setError(err instanceof Error ? err.message : "errore caricamento")
       );
     return () => {
       cancelled = true;
@@ -26,9 +26,11 @@ export default function CoveragePage() {
       <Nav />
 
       <header className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight">Coverage</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Copertura prezzi</h1>
         <p className="mt-2 text-sm text-neutral-400">
-          Stato del backfill prezzi per i 97 ticker dell'universe iniziale.
+          Stato dei dati di prezzo per i 97 ticker monitorati (S&P 500 top + ETF
+          settoriali, indici, commodity, bond, FX). Senza questi dati non si possono
+          calcolare le reazioni di mercato.
         </p>
       </header>
 
@@ -43,15 +45,17 @@ export default function CoveragePage() {
       ) : (
         <>
           <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatCard label="Universe" value={data.universe_size.toLocaleString()} />
-            <StatCard label="Covered" value={data.covered_tickers.toLocaleString()} />
-            <StatCard label="Missing" value={data.missing_tickers.length.toLocaleString()} />
-            <StatCard label="Total bars" value={data.total_bars.toLocaleString()} />
+            <StatCard label="Ticker monitorati" value={data.universe_size.toLocaleString("it-IT")} />
+            <StatCard label="Coperti" value={data.covered_tickers.toLocaleString("it-IT")} />
+            <StatCard label="Mancanti" value={data.missing_tickers.length.toLocaleString("it-IT")} />
+            <StatCard label="Prezzi totali" value={data.total_bars.toLocaleString("it-IT")} />
           </section>
 
           {data.missing_tickers.length > 0 && (
             <section className="mb-6 rounded-md border border-amber-900 bg-amber-950/30 p-4 text-sm">
-              <p className="font-medium text-amber-400">Ticker senza prezzi:</p>
+              <p className="font-medium text-amber-400">
+                Ticker senza prezzi (anomalia da investigare):
+              </p>
               <p className="mt-2 font-mono text-xs text-amber-300">
                 {data.missing_tickers.join(", ")}
               </p>
@@ -63,10 +67,10 @@ export default function CoveragePage() {
               <thead className="bg-neutral-950 text-xs uppercase tracking-wide text-neutral-500">
                 <tr>
                   <th className="px-3 py-2">Ticker</th>
-                  <th className="px-3 py-2 text-right">Bars</th>
-                  <th className="px-3 py-2">From</th>
-                  <th className="px-3 py-2">To</th>
-                  <th className="px-3 py-2 text-right">Last close</th>
+                  <th className="px-3 py-2 text-right">Prezzi storici</th>
+                  <th className="px-3 py-2">Dal</th>
+                  <th className="px-3 py-2">Al</th>
+                  <th className="px-3 py-2 text-right">Ultima chiusura</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-900">

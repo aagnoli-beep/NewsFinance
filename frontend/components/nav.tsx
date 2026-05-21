@@ -11,31 +11,31 @@ export function Nav() {
           href="/"
           className="text-neutral-400 hover:text-neutral-100"
         >
-          Status
+          Stato
         </Link>
         <Link
           href="/feed"
           className="text-neutral-400 hover:text-neutral-100"
         >
-          Feed
+          News
         </Link>
         <Link
           href="/clusters"
           className="text-neutral-400 hover:text-neutral-100"
         >
-          Clusters
+          Eventi
         </Link>
         <Link
           href="/alerts"
           className="text-neutral-400 hover:text-neutral-100"
         >
-          Alerts
+          Avvisi
         </Link>
         <Link
           href="/coverage"
           className="text-neutral-400 hover:text-neutral-100"
         >
-          Coverage
+          Copertura
         </Link>
       </div>
     </nav>

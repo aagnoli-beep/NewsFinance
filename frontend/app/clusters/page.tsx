@@ -8,20 +8,26 @@ import {
   type ClusterListResponse,
   type ClusterStats,
 } from "@/lib/api";
+import {
+  eventTypeIT,
+  surpriseColorIT,
+  SURPRISE_EMOJI,
+  surpriseIT,
+} from "@/lib/labels";
 
 const EVENT_TYPES = [
-  { label: "All", value: "" },
-  { label: "Earnings", value: "earnings" },
+  { label: "Tutti", value: "" },
+  { label: "Risultati trimestrali", value: "earnings" },
   { label: "Guidance", value: "guidance" },
   { label: "M&A", value: "m_and_a" },
-  { label: "Contract", value: "contract" },
-  { label: "Macro", value: "macro_data" },
-  { label: "Central bank", value: "central_bank" },
-  { label: "Geopolitical", value: "geopolitical" },
-  { label: "Regulatory", value: "regulatory" },
-  { label: "Product", value: "product" },
-  { label: "Personnel", value: "personnel" },
-  { label: "Analyst rating", value: "analyst_rating" },
+  { label: "Contratti", value: "contract" },
+  { label: "Dati macro", value: "macro_data" },
+  { label: "Banca centrale", value: "central_bank" },
+  { label: "Geopolitica", value: "geopolitical" },
+  { label: "Regolamentazione", value: "regulatory" },
+  { label: "Prodotto", value: "product" },
+  { label: "Personale", value: "personnel" },
+  { label: "Rating analisti", value: "analyst_rating" },
 ];
 
 export default function ClustersPage() {
@@ -51,7 +57,7 @@ export default function ClustersPage() {
         }
       } catch (err) {
         if (!cancelled)
-          setError(err instanceof Error ? err.message : "fetch failed");
+          setError(err instanceof Error ? err.message : "errore caricamento");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -70,26 +76,27 @@ export default function ClustersPage() {
       <Nav />
 
       <header className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight">Event clusters</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Eventi classificati</h1>
         <p className="mt-2 text-sm text-neutral-400">
-          Cluster di eventi classificati dal LLM (Claude Haiku) con entità e
-          sorpresa stimata. Aggiornamento ogni 30s.
+          News raggruppate per evento unico e interpretate dall'AI: tipo evento,
+          aziende coinvolte, sorpresa rispetto alle attese. Si aggiorna ogni 30
+          secondi.
         </p>
       </header>
 
       {stats && (
         <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard label="Total" value={stats.total_clusters.toLocaleString()} />
+          <StatCard label="Eventi totali" value={stats.total_clusters.toLocaleString("it-IT")} />
           <StatCard
-            label="Classified"
-            value={stats.classified.toLocaleString()}
+            label="Classificati"
+            value={stats.classified.toLocaleString("it-IT")}
           />
           <StatCard
-            label="With expectations"
-            value={stats.with_expectations.toLocaleString()}
+            label="Con sorpresa"
+            value={stats.with_expectations.toLocaleString("it-IT")}
           />
           <StatCard
-            label="Coverage"
+            label="Copertura AI"
             value={
               stats.total_clusters
                 ? `${Math.round((stats.classified / stats.total_clusters) * 100)}%`
@@ -127,10 +134,8 @@ export default function ClustersPage() {
 
       {!loading && items.length === 0 && (
         <div className="rounded-md border border-neutral-800 bg-neutral-950 p-6 text-sm text-neutral-400">
-          Nessun cluster classificato ancora. Il classifier richiede{" "}
-          <code className="font-mono text-emerald-400">ANTHROPIC_API_KEY</code>{" "}
-          configurata su Railway. Appena attivata, gira ogni 5 minuti e
-          processa i cluster pendenti.
+          Nessun evento classificato per questo filtro. Il classifier sta
+          processando il backlog (50 eventi ogni 5 minuti).
         </div>
       )}
 
@@ -156,6 +161,7 @@ function ClusterCard({ cluster }: { cluster: Cluster }) {
   const ts = new Date(cluster.first_seen);
   const primary = cluster.entities.filter((e) => e.role === "primary");
   const mentioned = cluster.entities.filter((e) => e.role === "mentioned");
+  const rilevanzaPct = Math.round(cluster.novelty_score * 100);
 
   return (
     <li className="rounded-md border border-neutral-900 bg-neutral-950 p-4">
@@ -169,11 +175,11 @@ function ClusterCard({ cluster }: { cluster: Cluster }) {
           })}
         </time>
         <span className="rounded bg-emerald-950 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-emerald-400">
-          {cluster.event_type}
+          {eventTypeIT(cluster.event_type)}
         </span>
         <span className="text-[10px] text-neutral-500">
-          novelty {cluster.novelty_score.toFixed(2)} · {cluster.n_sources}{" "}
-          {cluster.n_sources === 1 ? "source" : "sources"}
+          rilevanza {rilevanzaPct}% · {cluster.n_sources}{" "}
+          {cluster.n_sources === 1 ? "fonte" : "fonti"}
         </span>
       </div>
 
@@ -185,26 +191,45 @@ function ClusterCard({ cluster }: { cluster: Cluster }) {
       )}
 
       {(primary.length > 0 || mentioned.length > 0) && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {primary.map((e) => (
-            <EntityChip key={e.id} entity={e} primary />
-          ))}
-          {mentioned.map((e) => (
-            <EntityChip key={e.id} entity={e} />
-          ))}
+        <div className="mt-3 flex flex-wrap items-baseline gap-2">
+          {primary.length > 0 && (
+            <>
+              <span className="text-[10px] uppercase tracking-wide text-neutral-500">
+                Principale:
+              </span>
+              {primary.map((e) => (
+                <EntityChip key={e.id} entity={e} primary />
+              ))}
+            </>
+          )}
+          {mentioned.length > 0 && (
+            <>
+              <span className="ml-2 text-[10px] uppercase tracking-wide text-neutral-500">
+                Citati:
+              </span>
+              {mentioned.slice(0, 6).map((e) => (
+                <EntityChip key={e.id} entity={e} />
+              ))}
+            </>
+          )}
         </div>
       )}
 
       {cluster.expectation && (
         <div className="mt-3 rounded border border-neutral-900 bg-neutral-900/50 p-3 text-xs">
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-wide text-neutral-500">
-            <span>Surprise</span>
-            <SurpriseBadge
-              direction={cluster.expectation.surprise_direction}
-              magnitude={cluster.expectation.surprise_magnitude}
-            />
-            <span className="text-neutral-600">
-              · {cluster.expectation.baseline_source.replace(/_/g, " ")}
+          <div className="flex items-center gap-2">
+            <span className="text-[14px]">
+              {SURPRISE_EMOJI[cluster.expectation.surprise_direction] ?? "⚪"}
+            </span>
+            <span
+              className={`font-medium ${surpriseColorIT(
+                cluster.expectation.surprise_direction
+              )}`}
+            >
+              {surpriseIT(
+                cluster.expectation.surprise_direction,
+                cluster.expectation.surprise_magnitude
+              )}
             </span>
           </div>
           {cluster.expectation.rationale && (
@@ -236,31 +261,6 @@ function EntityChip({
       ) : (
         entity.name
       )}
-      <span className="ml-1 opacity-60">· {entity.type}</span>
-    </span>
-  );
-}
-
-function SurpriseBadge({
-  direction,
-  magnitude,
-}: {
-  direction: string;
-  magnitude: string;
-}) {
-  const dirColor: Record<string, string> = {
-    positive: "bg-emerald-950 text-emerald-400",
-    negative: "bg-red-950 text-red-400",
-    neutral: "bg-neutral-900 text-neutral-400",
-    uncertain: "bg-amber-950 text-amber-400",
-  };
-  return (
-    <span
-      className={`rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${
-        dirColor[direction] ?? "bg-neutral-900 text-neutral-400"
-      }`}
-    >
-      {direction} · {magnitude}
     </span>
   );
 }
