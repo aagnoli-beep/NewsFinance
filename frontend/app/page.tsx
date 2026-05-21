@@ -17,6 +17,7 @@ export default function HomePage() {
   const [items, setItems] = useState<Alert[]>([]);
   const [stats, setStats] = useState<AlertsStats | null>(null);
   const [minScore, setMinScore] = useState(0.65);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,7 +55,6 @@ export default function HomePage() {
     };
   }, [tab, minScore]);
 
-  // Calcolo % avverati nello storico
   const evaluated = stats
     ? (stats.outcomes.confirmed_direction || 0) + (stats.outcomes.reversed || 0)
     : 0;
@@ -62,72 +62,76 @@ export default function HomePage() {
   const precisionPct = evaluated > 0 ? (confirmed / evaluated) * 100 : null;
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
+    <main className="mx-auto max-w-3xl px-6 py-10">
       <Nav />
 
-      <header className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight">Avvisi</h1>
-        <p className="mt-2 text-sm text-neutral-400">
-          Eventi finanziari rilevanti monitorati 24/7. Recenti = appena rilevati,
-          Storico = già verificati dopo qualche giorno.
-        </p>
-      </header>
-
-      {/* Tab switcher */}
-      <div className="mb-6 flex gap-1 rounded-md border border-neutral-800 bg-neutral-950 p-1">
+      {/* Tab switcher prominente */}
+      <div className="mb-6 flex gap-1 rounded-lg border border-neutral-800 bg-neutral-950 p-1">
         <TabButton active={tab === "recenti"} onClick={() => setTab("recenti")}>
-          📨 Recenti{" "}
-          {stats && (
-            <span className="ml-1 text-neutral-500">
-              · {stats.last_7d}
-            </span>
+          📨 Recenti
+          {stats && stats.last_7d > 0 && (
+            <span className="ml-1.5 text-neutral-500">· {stats.last_7d}</span>
           )}
         </TabButton>
         <TabButton active={tab === "storico"} onClick={() => setTab("storico")}>
-          📜 Storico verificati
+          📜 Storico
           {stats && evaluated > 0 && (
-            <span className="ml-1 text-neutral-500">· {evaluated}</span>
+            <span className="ml-1.5 text-neutral-500">· {evaluated}</span>
           )}
         </TabButton>
       </div>
 
-      {/* Banner statistica precisione (solo per tab storico) */}
+      {/* Banner precisione storica */}
       {tab === "storico" && stats && evaluated > 0 && (
         <div className="mb-6 rounded-md border border-neutral-800 bg-neutral-950 p-4">
-          <p className="text-xs uppercase tracking-wide text-neutral-500">
-            Precisione storica
-          </p>
-          <p className="mt-1 text-lg">
-            <span className="font-mono font-semibold text-emerald-400">
-              {precisionPct?.toFixed(0)}%
-            </span>{" "}
-            <span className="text-sm text-neutral-400">
-              degli avvisi confermati dal mercato
-            </span>
-          </p>
-          <p className="mt-1 text-xs text-neutral-500">
-            {confirmed} confermati · {stats.outcomes.reversed || 0} direzione opposta
-            · {stats.outcomes.flat || 0} senza movimento
-            · {stats.outcomes.confounded || 0} cause incerte
-          </p>
+          <div className="flex items-baseline justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-neutral-500">
+                Avvisi confermati dal mercato
+              </p>
+              <p className="mt-1 text-2xl font-mono font-semibold text-emerald-400 tabular-nums">
+                {precisionPct?.toFixed(0)}%
+              </p>
+            </div>
+            <div className="text-right text-xs text-neutral-500 leading-relaxed">
+              <p>{confirmed} confermati</p>
+              <p>{stats.outcomes.reversed || 0} direzione opposta</p>
+              {(stats.outcomes.flat || 0) > 0 && (
+                <p>{stats.outcomes.flat} senza movimento</p>
+              )}
+              {(stats.outcomes.confounded || 0) > 0 && (
+                <p>{stats.outcomes.confounded} cause incerte</p>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Slider soglia importanza */}
-      <div className="mb-6 flex items-center gap-3 text-sm">
-        <span className="text-neutral-400">Importanza minima:</span>
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.05"
-          value={minScore}
-          onChange={(e) => setMinScore(parseFloat(e.target.value))}
-          className="w-48"
-        />
-        <span className="font-mono tabular-nums text-neutral-100">
-          {minScore.toFixed(2)}
-        </span>
+      {/* Pannello filtri collassabile */}
+      <div className="mb-6">
+        <button
+          onClick={() => setFiltersOpen(!filtersOpen)}
+          className="text-xs text-neutral-500 hover:text-neutral-300"
+        >
+          {filtersOpen ? "▾" : "▸"} Filtri
+        </button>
+        {filtersOpen && (
+          <div className="mt-2 flex items-center gap-3 text-sm">
+            <span className="text-xs text-neutral-400">Importanza minima:</span>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={minScore}
+              onChange={(e) => setMinScore(parseFloat(e.target.value))}
+              className="w-40"
+            />
+            <span className="font-mono text-xs tabular-nums text-neutral-200">
+              {minScore.toFixed(2)}
+            </span>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -144,14 +148,14 @@ export default function HomePage() {
         <EmptyState tab={tab} minScore={minScore} />
       )}
 
-      <ul className="space-y-6">
+      <ul className="space-y-5">
         {items.map((alert) => (
           <AlertCard key={alert.id} alert={alert} />
         ))}
       </ul>
 
-      <footer className="mt-16 text-xs text-neutral-500">
-        Ricerca e analisi, non consulenza finanziaria personalizzata.
+      <footer className="mt-20 text-xs text-neutral-600 leading-relaxed">
+        Ricerca e analisi automatizzata. Non consulenza finanziaria personalizzata.
       </footer>
     </main>
   );
@@ -169,7 +173,7 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`flex-1 rounded px-4 py-2 text-sm font-medium transition ${
+      className={`flex-1 rounded-md px-4 py-2.5 text-sm font-medium transition ${
         active
           ? "bg-neutral-900 text-neutral-100"
           : "text-neutral-500 hover:text-neutral-300"
@@ -185,13 +189,12 @@ function EmptyState({ tab, minScore }: { tab: Tab; minScore: number }) {
     return (
       <div className="rounded-md border border-neutral-800 bg-neutral-950 p-6 text-sm text-neutral-400 leading-relaxed">
         <p className="font-medium text-neutral-200">
-          Nessun avviso ancora verificato.
+          Lo storico è ancora vuoto.
         </p>
         <p className="mt-2 text-xs">
           Gli avvisi vengono verificati 3 giorni dopo l'evento, confrontando la
-          previsione di sorpresa con il movimento effettivo del prezzo. Servono
-          quindi almeno 3 giorni dal primo avviso generato per popolare questa
-          sezione.
+          previsione con il movimento effettivo del prezzo. Serve quindi qualche
+          giorno dal primo avviso generato per popolare questa sezione.
         </p>
       </div>
     );
@@ -199,12 +202,13 @@ function EmptyState({ tab, minScore }: { tab: Tab; minScore: number }) {
   return (
     <div className="rounded-md border border-neutral-800 bg-neutral-950 p-6 text-sm text-neutral-400 leading-relaxed">
       <p className="font-medium text-neutral-200">
-        Nessun avviso recente con importanza ≥ {minScore.toFixed(2)}.
+        Nessun avviso al momento.
       </p>
       <p className="mt-2 text-xs">
-        Il sistema genera avvisi solo quando un evento ha sorpresa materiale +
-        esposizione su asset noti + reazione conferma di mercato. Se vuoi vedere
-        anche eventi minori, abbassa la soglia.
+        Il sistema sta monitorando news, dati macro e prezzi 24/7. Genera un
+        avviso solo quando un evento ha sorpresa materiale + reazione di
+        mercato confermata. Importanza minima attuale:{" "}
+        <span className="font-mono">{minScore.toFixed(2)}</span>.
       </p>
     </div>
   );
