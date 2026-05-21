@@ -27,6 +27,15 @@ EMBEDDING_DIM = 1024
 SIMILARITY_THRESHOLD = 0.85
 LOOKBACK_HOURS = 24
 
+# Sources che usano URL sintetici deterministici (synthetic_url unico per chiave
+# symbol+date). NON applichiamo dedup semantico: ogni raw_event è un cluster
+# distinto. Il dedup esatto via url_hash (in base.NewsIngester) impedisce già
+# duplicati cross-batch.
+# Rationale: queste headline hanno format-template ("X earnings scheduled for Y")
+# che la similarità coseno di embeddings considera erroneamente simili anche fra
+# ticker diversi.
+STRUCTURED_SOURCE_PREFIXES = ("finnhub:earnings_calendar", "fred:")
+
 
 class DedupEngine:
     """Processa raw_events non clusterizzati in cluster di eventi.
@@ -66,9 +75,26 @@ class DedupEngine:
         existing_count = 0
         errored = 0
 
-        # Processiamo a batch per ottimizzare costi embedding (Voyage gestisce batching).
-        for batch_start in range(0, len(pending), self.batch_size):
-            batch = pending[batch_start : batch_start + self.batch_size]
+        # Split per strategia: structured sources → singolo cluster ognuno,
+        # senza chiamare Voyage (no rischio falsi-positivi su template headlines).
+        structured = [e for e in pending if self._is_structured(e.source)]
+        semantic = [e for e in pending if not self._is_structured(e.source)]
+
+        for event in structured:
+            try:
+                await self._create_cluster_no_embedding(event)
+                await self.session.commit()
+                new_count += 1
+            except Exception as exc:
+                await self.session.rollback()
+                logger.warning(
+                    "dedup_structured_error", raw_event_id=event.id, error=str(exc)
+                )
+                errored += 1
+
+        # Per news libere: pipeline embedding + cosine similarity come prima.
+        for batch_start in range(0, len(semantic), self.batch_size):
+            batch = semantic[batch_start : batch_start + self.batch_size]
             texts = [self._build_text(event) for event in batch]
 
             try:
@@ -177,6 +203,36 @@ class DedupEngine:
         self.session.add(
             EventClusterMember(cluster_id=cluster.id, raw_event_id=event.id, similarity=1.0)
         )
+        await self.session.execute(
+            update(RawEvent).where(RawEvent.id == event.id).values(cluster_id=cluster.id)
+        )
+
+    @staticmethod
+    def _is_structured(source: str) -> bool:
+        return any(source.startswith(p) for p in STRUCTURED_SOURCE_PREFIXES)
+
+    async def _create_cluster_no_embedding(self, event: RawEvent) -> None:
+        """Cluster diretto senza embedding per fonti structured (earnings_calendar, fred).
+
+        Un raw_event = un cluster. Niente similarity check (gli URL sintetici
+        deterministici fanno già il lavoro di dedup esatto tramite url_hash).
+        """
+        cluster = EventCluster(
+            first_seen=event.published_at or event.ingested_at,
+            event_type="unclassified",
+            headline_canonical=event.headline,
+            summary=event.body,
+            embedding=None,
+            novelty_score=0.5,
+        )
+        self.session.add(cluster)
+        await self.session.flush()
+
+        self.session.add(
+            EventClusterMember(cluster_id=cluster.id, raw_event_id=event.id, similarity=1.0)
+        )
+        from sqlalchemy import update
+
         await self.session.execute(
             update(RawEvent).where(RawEvent.id == event.id).values(cluster_id=cluster.id)
         )
