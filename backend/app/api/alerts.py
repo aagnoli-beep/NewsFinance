@@ -107,9 +107,27 @@ async def list_alerts(
     limit: int = Query(default=30, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     min_score: float = Query(default=0.0, ge=0.0, le=1.0),
+    outcome_state: str = Query(
+        default="all",
+        description="all | recent (pending o senza outcome) | evaluated (outcome valutato)",
+    ),
 ) -> AlertListResponse:
     base = select(Alert).where(Alert.impact_score >= min_score)
-    total = (await session.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0
+
+    if outcome_state == "recent":
+        # Alert senza outcome valutato OPPURE con outcome ancora pending
+        base = base.outerjoin(Outcome, Outcome.alert_id == Alert.id).where(
+            (Outcome.id.is_(None)) | (Outcome.outcome_label == "pending")
+        )
+    elif outcome_state == "evaluated":
+        # Alert con outcome valutato (label diverso da pending)
+        base = base.join(Outcome, Outcome.alert_id == Alert.id).where(
+            Outcome.outcome_label != "pending"
+        )
+
+    total = (
+        await session.execute(select(func.count()).select_from(base.subquery()))
+    ).scalar() or 0
 
     rows = (
         await session.execute(
