@@ -149,6 +149,119 @@ async def list_clusters(
     return ClusterListResponse(items=items, total=total)
 
 
+@router.get("/important", response_model=ClusterListResponse)
+async def list_important_clusters(
+    session: SessionDep,
+    limit: int = Query(default=30, ge=1, le=100),
+    min_novelty: float = Query(default=0.5, ge=0.0, le=1.0),
+    days: int = Query(default=7, ge=1, le=90),
+) -> ClusterListResponse:
+    """Cluster classificati ordinati per priorità (eventi rilevanti del giorno).
+
+    Logica priorità:
+    1. Cluster recenti (ultimi N giorni)
+    2. Novelty >= min_novelty
+    3. Ordinati per (novelty + surprise materiality) desc
+    """
+    from datetime import timedelta
+
+    from sqlalchemy import case
+
+    cutoff = func.now() - func.make_interval(0, 0, 0, days)
+    _ = timedelta  # silenzia import-non-usato se mai serve
+
+    # Score di sorpresa via case (high=1.0, medium=0.5, low=0.2, neutral/uncertain * 0.3)
+    surprise_score = case(
+        (
+            (Expectation.surprise_direction.in_(["neutral", "uncertain"])),
+            case(
+                (Expectation.surprise_magnitude == "high", 0.3),
+                (Expectation.surprise_magnitude == "medium", 0.15),
+                (Expectation.surprise_magnitude == "low", 0.06),
+                else_=0.0,
+            ),
+        ),
+        else_=case(
+            (Expectation.surprise_magnitude == "high", 1.0),
+            (Expectation.surprise_magnitude == "medium", 0.5),
+            (Expectation.surprise_magnitude == "low", 0.2),
+            else_=0.0,
+        ),
+    )
+
+    priority = EventCluster.novelty_score * 0.5 + func.coalesce(surprise_score, 0.0) * 0.5
+
+    base = (
+        select(EventCluster)
+        .outerjoin(Expectation, Expectation.cluster_id == EventCluster.id)
+        .where(EventCluster.event_type != "unclassified")
+        .where(EventCluster.novelty_score >= min_novelty)
+        .where(EventCluster.first_seen >= cutoff)
+        .order_by(desc(priority), desc(EventCluster.first_seen))
+        .limit(limit)
+    )
+
+    rows = (await session.execute(base)).scalars().all()
+
+    items: list[ClusterOut] = []
+    for cluster in rows:
+        n_sources = (
+            await session.execute(
+                select(func.count())
+                .select_from(RawEvent)
+                .where(RawEvent.cluster_id == cluster.id)
+            )
+        ).scalar() or 0
+
+        entity_rows = (
+            await session.execute(
+                select(Entity, EventEntity.role)
+                .join(EventEntity, EventEntity.entity_id == Entity.id)
+                .where(EventEntity.cluster_id == cluster.id)
+            )
+        ).all()
+
+        entities = [
+            EntityOut(id=e.id, type=e.type, name=e.name, ticker=e.ticker, role=role)
+            for e, role in entity_rows
+        ]
+
+        exp = (
+            await session.execute(
+                select(Expectation).where(Expectation.cluster_id == cluster.id)
+            )
+        ).scalar_one_or_none()
+        expectation = (
+            ExpectationOut(
+                baseline_source=exp.baseline_source,
+                expected_value=exp.expected_value,
+                actual_value=exp.actual_value,
+                surprise_direction=exp.surprise_direction,
+                surprise_magnitude=exp.surprise_magnitude,
+                surprise_zscore=exp.surprise_zscore,
+                rationale=exp.rationale,
+            )
+            if exp
+            else None
+        )
+
+        items.append(
+            ClusterOut(
+                id=cluster.id,
+                first_seen=cluster.first_seen,
+                event_type=cluster.event_type,
+                headline_canonical=cluster.headline_canonical,
+                summary=cluster.summary,
+                novelty_score=cluster.novelty_score,
+                n_sources=n_sources,
+                entities=entities,
+                expectation=expectation,
+            )
+        )
+
+    return ClusterListResponse(items=items, total=len(items))
+
+
 @router.get("/stats", response_model=ClusterStats)
 async def cluster_stats(session: SessionDep) -> ClusterStats:
     total = (await session.execute(select(func.count()).select_from(EventCluster))).scalar() or 0
