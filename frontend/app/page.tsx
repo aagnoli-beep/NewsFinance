@@ -137,16 +137,10 @@ export default function HomePage() {
         </p>
       )}
 
-      {loading && important.length === 0 && (
-        <p className="text-sm text-neutral-500">Caricamento…</p>
-      )}
-
       {/* Tab Recenti = lista eventi rilevanti */}
-      {tab === "recenti" && !loading && (
+      {tab === "recenti" && (
         <>
-          {important.length === 0 ? (
-            <EmptyRecenti />
-          ) : (
+          {important.length > 0 ? (
             <ul className="space-y-3">
               {important.map((c) => (
                 <EventCard
@@ -156,21 +150,27 @@ export default function HomePage() {
                 />
               ))}
             </ul>
+          ) : loading ? (
+            <p className="text-sm text-neutral-500">Caricamento…</p>
+          ) : (
+            <EmptyRecenti />
           )}
         </>
       )}
 
       {/* Tab Storico = lista alert valutati */}
-      {tab === "storico" && !loading && (
+      {tab === "storico" && (
         <>
-          {evaluatedAlerts.length === 0 ? (
-            <EmptyStorico />
-          ) : (
+          {evaluatedAlerts.length > 0 ? (
             <ul className="space-y-5">
               {evaluatedAlerts.map((alert) => (
                 <AlertHistoricCard key={alert.id} alert={alert} />
               ))}
             </ul>
+          ) : loading ? (
+            <p className="text-sm text-neutral-500">Caricamento…</p>
+          ) : (
+            <EmptyStorico />
           )}
         </>
       )}
