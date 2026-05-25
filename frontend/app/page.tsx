@@ -34,32 +34,38 @@ export default function HomePage() {
 
     async function load() {
       setLoading(true);
-      try {
-        const [imp, conf, evald, s] = await Promise.all([
-          apiFetch<ClusterListResponse>(
-            `/api/clusters/important?limit=30&min_novelty=0.55&days=7`
-          ),
-          apiFetch<AlertListResponse>(
-            `/api/alerts?limit=10&min_score=0.65&outcome_state=recent`
-          ),
-          apiFetch<AlertListResponse>(
-            `/api/alerts?limit=30&min_score=0.0&outcome_state=evaluated`
-          ),
-          apiFetch<AlertsStats>("/api/alerts/stats"),
-        ]);
-        if (!cancelled) {
-          setImportant(imp.items);
-          setConfirmedAlerts(conf.items);
-          setEvaluatedAlerts(evald.items);
-          setStats(s);
-          setError(null);
-        }
-      } catch (err) {
-        if (!cancelled)
-          setError(err instanceof Error ? err.message : "errore caricamento");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+      const results = await Promise.allSettled([
+        apiFetch<ClusterListResponse>(
+          `/api/clusters/important?limit=30&min_novelty=0.55&days=7`
+        ),
+        apiFetch<AlertListResponse>(
+          `/api/alerts?limit=10&min_score=0.65&outcome_state=recent`
+        ),
+        apiFetch<AlertListResponse>(
+          `/api/alerts?limit=30&min_score=0.0&outcome_state=evaluated`
+        ),
+        apiFetch<AlertsStats>("/api/alerts/stats"),
+      ]);
+
+      if (cancelled) return;
+
+      const [impRes, confRes, evalRes, statsRes] = results;
+      const errors: string[] = [];
+
+      if (impRes.status === "fulfilled") setImportant(impRes.value.items);
+      else errors.push(`important: ${impRes.reason}`);
+
+      if (confRes.status === "fulfilled") setConfirmedAlerts(confRes.value.items);
+      else errors.push(`alerts/recent: ${confRes.reason}`);
+
+      if (evalRes.status === "fulfilled") setEvaluatedAlerts(evalRes.value.items);
+      else errors.push(`alerts/evaluated: ${evalRes.reason}`);
+
+      if (statsRes.status === "fulfilled") setStats(statsRes.value);
+      else errors.push(`alerts/stats: ${statsRes.reason}`);
+
+      setError(errors.length > 0 ? errors.join(" · ") : null);
+      setLoading(false);
     }
 
     load();
