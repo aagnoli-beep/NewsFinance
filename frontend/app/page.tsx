@@ -217,56 +217,85 @@ function EventCard({
   const tickers = primary
     .filter((e) => e.ticker)
     .map((e) => e.ticker as string)
+    .slice(0, 6);
+  // Materia = entità primarie non-azienda (paese, commodity, settore, valuta, central_bank)
+  const materie = primary
+    .filter((e) => !e.ticker && ["country", "commodity", "sector", "currency", "central_bank"].includes(e.type))
+    .map((e) => e.name)
     .slice(0, 4);
-  const novPct = Math.round(cluster.novelty_score * 100);
+
+  // Calcolo score 0-100: novelty + intensità sorpresa
+  const surpriseScore = scoreSurprise(cluster.expectation);
+  const totalScore = Math.round((cluster.novelty_score * 0.5 + surpriseScore * 0.5) * 100);
+
+  // Titolo: usa summary italiano se disponibile, altrimenti headline_canonical
+  const titolo = cluster.summary?.trim() || cluster.headline_canonical;
+  const fonteOriginale = cluster.summary?.trim() ? cluster.headline_canonical : null;
 
   return (
     <li className="rounded-lg border border-neutral-800 bg-neutral-950 p-5">
-      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
-        <time className="font-mono">
-          {ts.toLocaleString("it-IT", {
-            month: "short",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </time>
-        <span className="rounded bg-emerald-950 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-emerald-400">
-          {eventTypeIT(cluster.event_type)}
-        </span>
-        {confirmed && (
-          <span className="rounded bg-amber-950 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-amber-300">
-            ⭐ Confermato dal mercato
+      {/* Riga 1: meta info + score */}
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
+          <time className="font-mono">
+            {ts.toLocaleString("it-IT", {
+              month: "short",
+              day: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </time>
+          <span className="rounded bg-emerald-950 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-emerald-400">
+            {eventTypeIT(cluster.event_type)}
           </span>
-        )}
-        <span className="ml-auto text-[10px] text-neutral-600">
-          rilevanza {novPct}% · {cluster.n_sources}{" "}
-          {cluster.n_sources === 1 ? "fonte" : "fonti"}
-        </span>
+          {confirmed && (
+            <span className="rounded bg-amber-950 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-amber-300">
+              ⭐ Confermato
+            </span>
+          )}
+        </div>
+        <ScoreBadge score={totalScore} />
       </div>
 
+      {/* Titolo grande in italiano */}
       <h3 className="text-base font-medium leading-snug text-neutral-100">
-        {cluster.headline_canonical}
+        {titolo}
       </h3>
 
-      {cluster.summary && (
-        <p className="mt-1.5 text-sm text-neutral-400">{cluster.summary}</p>
-      )}
-
-      {tickers.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {tickers.map((t) => (
-            <span
-              key={t}
-              className="rounded bg-neutral-900 px-1.5 py-0.5 font-mono text-[11px] text-neutral-300"
-            >
-              {t}
-            </span>
-          ))}
+      {/* Strumenti + Materia */}
+      {(tickers.length > 0 || materie.length > 0) && (
+        <div className="mt-3 space-y-1.5 text-sm">
+          {tickers.length > 0 && (
+            <div className="flex flex-wrap items-baseline gap-1.5">
+              <span className="text-xs text-neutral-500 min-w-[70px]">💼 Strumenti:</span>
+              {tickers.map((t) => (
+                <span
+                  key={t}
+                  className="rounded bg-neutral-900 px-1.5 py-0.5 font-mono text-[11px] text-emerald-300"
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
+          {materie.length > 0 && (
+            <div className="flex flex-wrap items-baseline gap-1.5">
+              <span className="text-xs text-neutral-500 min-w-[70px]">🌐 Materia:</span>
+              {materie.map((m) => (
+                <span
+                  key={m}
+                  className="rounded bg-neutral-900 px-1.5 py-0.5 text-[11px] text-neutral-200"
+                >
+                  {m}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {cluster.expectation && cluster.expectation.surprise_direction !== "neutral" && (
+      {/* Sorpresa */}
+      {cluster.expectation && (
         <div className="mt-3 flex gap-2 border-t border-neutral-900 pt-3">
           <span>{SURPRISE_EMOJI[cluster.expectation.surprise_direction] ?? "⚪"}</span>
           <div className="flex-1 text-sm">
@@ -281,15 +310,65 @@ function EventCard({
               )}
             </p>
             {cluster.expectation.rationale && (
-              <p className="mt-1 text-xs text-neutral-400">
+              <p className="mt-1 text-xs text-neutral-400 leading-relaxed">
                 {cluster.expectation.rationale}
               </p>
             )}
           </div>
         </div>
       )}
+
+      {/* Fonte originale */}
+      {fonteOriginale && (
+        <details className="mt-3 border-t border-neutral-900 pt-2">
+          <summary className="cursor-pointer text-[11px] text-neutral-600 hover:text-neutral-400">
+            Headline originale (fonte)
+          </summary>
+          <p className="mt-1 text-xs italic text-neutral-500">{fonteOriginale}</p>
+        </details>
+      )}
+
+      <p className="mt-3 text-[10px] text-neutral-600">
+        Rilevanza {Math.round(cluster.novelty_score * 100)}% ·{" "}
+        {cluster.n_sources} {cluster.n_sources === 1 ? "fonte" : "fonti"}
+      </p>
     </li>
   );
+}
+
+function ScoreBadge({ score }: { score: number }) {
+  let color = "border-neutral-700 bg-neutral-900 text-neutral-300";
+  if (score >= 75) color = "border-emerald-600 bg-emerald-950 text-emerald-300";
+  else if (score >= 55) color = "border-amber-700 bg-amber-950 text-amber-300";
+  else if (score >= 35) color = "border-neutral-700 bg-neutral-900 text-neutral-300";
+
+  return (
+    <div className="flex flex-col items-end">
+      <span
+        className={`rounded-md border px-2.5 py-1 font-mono text-lg font-semibold tabular-nums ${color}`}
+      >
+        {score}
+      </span>
+      <span className="mt-0.5 text-[9px] uppercase tracking-wide text-neutral-600">
+        Punteggio
+      </span>
+    </div>
+  );
+}
+
+function scoreSurprise(exp: Cluster["expectation"]): number {
+  if (!exp) return 0;
+  const isMaterial = exp.surprise_direction === "positive" || exp.surprise_direction === "negative";
+  const magnitude = exp.surprise_magnitude;
+  if (isMaterial) {
+    if (magnitude === "high") return 1.0;
+    if (magnitude === "medium") return 0.6;
+    if (magnitude === "low") return 0.3;
+  }
+  // neutral o uncertain → bassa pesatura
+  if (magnitude === "high") return 0.3;
+  if (magnitude === "medium") return 0.15;
+  return 0.05;
 }
 
 function AlertHistoricCard({ alert }: { alert: Alert }) {
